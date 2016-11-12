@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<head>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        path {
+            fill: #ddd;
+            fill-opacity: .8;
+            stroke: #fff;
+            stroke-width: 1.5px;
+        }
+
+        line {
+            stroke: #999;
+        }
+    </style>
+</head>
+
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.6.20/topojson.min.js"></script>
+    <script src="https://code.jquery.com/jquery-2.2.1.min.js"></script>
+
+    <!-- <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script> -->
+    <!-- <script src="http://d3js.org/topojson.v1.min.js"></script> -->
+
+    <script>
+        var width = $(window).width(),
+            height = $(window).height();
+
+        var projection = d3.geo.mercator();
+        var path = d3.geo.path().projection(projection),
+            force = d3.layout.force().size([width, height]);
+
+        d3.select("body").append("div").attr("id", "buttons").style("position", "absolute").append("button").attr("id", "reset").text("Reset");
+        d3.select("#buttons").append("button").attr("id", "lineup").text("Line 'em up");
+        var svg = d3.select("body").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        var jsoncommunities = "http://camstark.github.io/calgis/CALGIS_ADM_COMMUNITY_DISTRICT/CALGIS_ADM_COMMUNITY_DISTRICT.json"
+        var jsonwards = "http://camstark.github.io/calgis/CALGIS_ADM_WARD/CALGIS_ADM_WARD.json"
+
+        d3.json("http://camstark.github.io/calgis/CALGIS_ADM_WARD/CALGIS_ADM_WARD.json", function(error, wards) {
+            if (error) throw error;
+
+            var wards = topojson.feature(wards, wards.objects.CALGIS_ADM_WARD),
+                nodes = [],
+                links = [];
+
+            projection
+                .scale(1)
+                .translate([0, 0])
+
+            $("#lineup").click(lineEmUp);
+            $("#reset").click(resetEm);
+            // $("#reset").click(function() {
+            //     window.alert("Can't figure out how to do that.")
+            // });
+
+            var b = path.bounds(wards),
+                s = .95 / Math.max((b[1][0] - b[0][0]) / width, (b[1][1] - b[0][1]) / height),
+                t = [(width - s * (b[1][0] + b[0][0])) / 2, (height - s * (b[1][1] + b[0][1])) / 2];
+
+            projection
+                .scale(s)
+                .translate(t)
+
+            wards.features.forEach(function(d, i) {
+                var centroid = path.centroid(d);
+                var bounds = path.bounds(d);
+                if (centroid.some(isNaN)) return;
+                centroid.x = centroid[0];
+                centroid.y = centroid[1];
+                centroid.feature = d;
+                centroid.bounds = bounds;
+                nodes.push(centroid);
+            });
+
+            d3.geom.voronoi().links(nodes).forEach(function(link) {
+                var dx = link.source.x - link.target.x,
+                    dy = link.source.y - link.target.y;
+                link.distance = Math.sqrt(dx * dx + dy * dy);
+                links.push(link);
+            });
+
+            force
+                .gravity(0)
+                .nodes(nodes)
+                .links(links)
+                .linkDistance(function(d) {
+                    return d.distance;
+                })
+                .start();
+
+            var lines = true;
+            if (lines === true) {
+                var link = svg.selectAll("line")
+                    .data(links)
+                    .enter().append("line")
+                    .attr("x1", function(d) {
+                        return d.source.x;
+                    })
+                    .attr("y1", function(d) {
+                        return d.source.y;
+                    })
+                    .attr("x2", function(d) {
+                        return d.target.x;
+                    })
+                    .attr("y2", function(d) {
+                        return d.target.y;
+                    });
+            }
+
+
+            var node = svg.selectAll("g")
+                .data(nodes)
+                .enter().append("g")
+                .attr("transform", function(d) {
+                    return "translate(" + -d.x + "," + -d.y + ")";
+                })
+                .on("click", function(d) {console.log(d3.select(this)); console.log(d)})
+                .call(force.drag)
+                .append("path")
+                .attr("transform", function(d) {
+                    return "translate(" + d.x + "," + d.y + ")";
+                })
+                .attr("d", function(d) {
+                    return path(d.feature);
+                });
+
+            force.on("tick", function(e) {
+
+                if (lines === true) {
+                    link.attr("x1", function(d) {
+                            return d.source.x;
+                        })
+                        .attr("y1", function(d) {
+                            return d.source.y;
+                        })
+                        .attr("x2", function(d) {
+                            return d.target.x;
+                        })
+                        .attr("y2", function(d) {
+                            return d.target.y;
+                        });
+                }
+
+                node.attr("transform", function(d) {
+                    return "translate(" + d.x + "," + d.y + ")";
+                });
+            });
+
+            function resetEm() {
+              svg.selectAll("g")
+                  .transition().duration(500)
+                  .attr("transform", function(d) {
+                      return "translate(" + -d.x + "," + -d.y + ")";
+                  })
+                  .selectAll("path")
+                  .attr("transform", function(d) {
+                      return "translate(" + d.x + "," + d.y + ")";
+                  })
+
+              // svg.selectAll("line")
+              //     .transition().duration(500)
+              //     .attr("x1", function(d) {
+              //         return d.source.x;
+              //     })
+              //     .attr("y1", function(d) {
+              //         return d.source.y;
+              //     })
+              //     .attr("x2", function(d) {
+              //         return d.target.x;
+              //     })
+              //     .attr("y2", function(d) {
+              //         return d.target.y;
+              //     });
+
+            }
+            function lineEmUp() {
+                // resetEm();
+                force.stop();
+                //put them in a line?
+                var direction = "vertical";
+                var xline = 0;
+                var yline = 0;
+                svg.selectAll("g")
+                    .transition().duration(500)
+                    .attr("transform", function(d,i) {
+                      var xBounds = d.bounds[1][0] - d.bounds[0][0];
+                      xline += xBounds;
+                      var yBounds = d.bounds[1][1] - d.bounds[0][1];
+                      yline += yBounds;
+                      if (direction === "vertical") {
+                        return "translate(" + (100-d[0]) + "," + (150-d[1] + yline - yBounds) + ")";
+                      }
+                      if (direction === "horizontal") {
+                        return "translate(" + (100-d.x + xline - xBounds) + "," + (200-d.y) + ")";
+                      }
+                    })
+                    .selectAll("path")
+                    .attr("transform", "translate(0,0)")
+
+                if (direction === "vertical") {
+                  svg.attr("height", yline);
+                  svg.attr("width", width);
+                }
+                if (direction === "horizontal") {
+                  svg.attr("width", xline);
+                  svg.attr("height", height);
+                }
+            }
+
+
+        });
+    </script>
