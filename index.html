@@ -41,7 +41,7 @@
         var jsoncommunities = "http://camstark.github.io/calgis/CALGIS_ADM_COMMUNITY_DISTRICT/CALGIS_ADM_COMMUNITY_DISTRICT.json"
         var jsonwards = "http://camstark.github.io/calgis/CALGIS_ADM_WARD/CALGIS_ADM_WARD.json"
 
-        d3.json("http://camstark.github.io/calgis/CALGIS_ADM_WARD/CALGIS_ADM_WARD.json", function(error, wards) {
+        d3.json("https://camstark.github.io/calgis/CALGIS_ADM_WARD/CALGIS_ADM_WARD.json", function(error, wards) {
             if (error) throw error;
 
             var wards = topojson.feature(wards, wards.objects.CALGIS_ADM_WARD),
